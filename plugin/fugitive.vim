@@ -916,6 +916,49 @@ function! s:StageDiffEdit() abort
   endif
 endfunction
 
+function! s:StageShowDiff(lnum) abort
+    let [filename, section] = s:stage_info(a:lnum)
+    let repo = s:repo()
+
+    if exists("s:diff_shown")
+        unlet! s:diff_shown
+        set noro ma
+        execute ":".s:diff_start.",".s:diff_end."delete _"
+        let cpos = getcurpos()
+        let cpos[1] = cpos[1]-1
+        call setpos(".", cpos)
+
+        set ro noma
+
+        unlet! s:diff_start
+        unlet! s:diff_end
+    else
+        let s:diff_shown = 1
+
+        if section ==# 'staged'
+            echomsg "Staged file ".filename
+            let cmd = repo.git_command("diff HEAD -- ".filename)
+            let cmd = substitute(cmd, "'", "", "g")
+            let output = split(system(cmd), "\n")
+
+            let s:diff_start = a:lnum + 1
+            let s:diff_end = s:diff_start + len(output) - 1
+            set noro modifiable
+            call append(".", output)
+            set ro noma
+
+        elseif section ==# 'unstaged'
+            echomsg "Unstaged file ".filename
+            "let u = repo.git_command("diff ".filename)
+            "echo u
+        endif
+    endif
+
+endfunction
+
+
+
+
 function! s:StageToggle(lnum1,lnum2) abort
   if a:lnum1 == 1 && a:lnum2 == 1
     return 'Gedit /.git|call search("^index$", "wc")'
@@ -2546,6 +2589,7 @@ function! s:BufReadIndex() abort
     nunmap   <buffer>          ~
     nnoremap <buffer> <silent> <C-N> :<C-U>execute <SID>StageNext(v:count1)<CR>
     nnoremap <buffer> <silent> <C-P> :<C-U>execute <SID>StagePrevious(v:count1)<CR>
+    nnoremap <buffer> <tab> :<C-U>call <SID>StageShowDiff(line('.'))<CR>
     nnoremap <buffer> <silent> - :<C-U>silent execute <SID>StageToggle(line('.'),line('.')+v:count1-1)<CR>
     xnoremap <buffer> <silent> - :<C-U>silent execute <SID>StageToggle(line("'<"),line("'>"))<CR>
     nnoremap <buffer> <silent> a :<C-U>let b:fugitive_display_format += 1<Bar>exe <SID>BufReadIndex()<CR>
