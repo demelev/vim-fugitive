@@ -933,10 +933,24 @@ function! s:StageShowDiff(lnum) abort
         unlet! s:diff_start
         unlet! s:diff_end
     else
-        let s:diff_shown = 1
+
+        "if filename != ""
+        "endif
 
         if section ==# 'staged'
-            echomsg "Staged file ".filename
+            let s:diff_shown = 1
+
+            let cmd = repo.git_command("diff HEAD -- ".filename)
+            let cmd = substitute(cmd, "'", "", "g")
+            let output = split(system(cmd), "\n")
+            let s:diff_start = a:lnum + 1
+            let s:diff_end = s:diff_start + len(output) - 1
+            set noro modifiable
+            call append(".", output)
+            set ro noma
+
+        elseif section ==# 'unstaged'
+            let s:diff_shown = 1
             let cmd = repo.git_command("diff HEAD -- ".filename)
             let cmd = substitute(cmd, "'", "", "g")
             let output = split(system(cmd), "\n")
@@ -946,9 +960,6 @@ function! s:StageShowDiff(lnum) abort
             set noro modifiable
             call append(".", output)
             set ro noma
-
-        elseif section ==# 'unstaged'
-            echomsg "Unstaged file ".filename
             "let u = repo.git_command("diff ".filename)
             "echo u
         endif
