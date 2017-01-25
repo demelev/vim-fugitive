@@ -928,7 +928,7 @@ function! s:StageShowDiff(lnum) abort
         let cpos[1] = cpos[1]-1
         call setpos(".", cpos)
 
-        set ro noma
+        set ro noma nomod
 
         unlet! s:diff_start
         unlet! s:diff_end
@@ -947,7 +947,7 @@ function! s:StageShowDiff(lnum) abort
             let s:diff_end = s:diff_start + len(output) - 1
             set noro modifiable
             call append(".", output)
-            set ro noma
+            set ro noma nomod
 
         elseif section ==# 'unstaged'
             let s:diff_shown = 1
