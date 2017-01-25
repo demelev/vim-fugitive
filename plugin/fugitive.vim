@@ -936,9 +936,8 @@ function! s:StageShowDiff(lnum) abort
         if section ==# 'staged'
             let s:diff_shown = 1
 
-            let cmd = repo.git_command("diff HEAD ".filename)
-            let cmd = substitute(cmd, "'", "", "g")
-            let output = split(system(cmd), "\n")
+            let output = repo.git_chomp_in_tree("diff", "HEAD", filename)
+            let output = split(output, "\n")
             let s:diff_start = a:lnum + 1
             let s:diff_end = s:diff_start + len(output) - 1
             set noro modifiable
@@ -947,10 +946,8 @@ function! s:StageShowDiff(lnum) abort
 
         elseif section ==# 'unstaged'
             let s:diff_shown = 1
-            let cmd = repo.git_command("diff HEAD ".filename)
-            let cmd = substitute(cmd, "'", "", "g")
-            let output = split(system(cmd), "\n")
-
+            let output = repo.git_chomp_in_tree("diff", "HEAD", filename)
+            let output = split(output, "\n")
             let s:diff_start = a:lnum + 1
             let s:diff_end = s:diff_start + len(output) - 1
             set noro modifiable
@@ -3146,4 +3143,5 @@ augroup fugitive_foldtext
         \ if &filetype =~# '^git\%(commit\)\=$' && &foldtext ==# 'foldtext()' |
         \    set foldtext=fugitive#foldtext() |
         \ endif
+
 augroup END
