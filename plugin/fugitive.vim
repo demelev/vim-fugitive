@@ -932,12 +932,13 @@ function! s:StageShowDiff(lnum) abort
 
         unlet! s:diff_start
         unlet! s:diff_end
+        unlet! s:hunks
     else
         if section ==# 'staged'
             let s:diff_shown = 1
 
-            let output = repo.git_chomp_in_tree("diff", "HEAD", filename)
-            let output = split(output, "\n")
+            let output = repo.git_chomp_in_tree("diff", "--cached", "HEAD", filename)
+            let output = split(output, "\n")[4:]
             let s:diff_start = a:lnum + 1
             let s:diff_end = s:diff_start + len(output) - 1
             set noro modifiable
@@ -947,7 +948,8 @@ function! s:StageShowDiff(lnum) abort
         elseif section ==# 'unstaged'
             let s:diff_shown = 1
             let output = repo.git_chomp_in_tree("diff", "HEAD", filename)
-            let output = split(output, "\n")
+            let output = split(output, "\n")[4:] "skip first 4 lines
+            let s:hunks = s:parse_hunks(output)
             let s:diff_start = a:lnum + 1
             let s:diff_end = s:diff_start + len(output) - 1
             set noro modifiable
@@ -958,10 +960,109 @@ function! s:StageShowDiff(lnum) abort
 
 endfunction
 
+let s:hunk_re = '^@@ -\(\d\+\),\?\(\d*\) +\(\d\+\),\?\(\d*\) @@'
+function! s:parse_hunk(line)
+  let matches = matchlist(a:line, s:hunk_re)
+  if len(matches) > 0
+    let from_line  = str2nr(matches[1])
+    let from_count = (matches[2] == '') ? 1 : str2nr(matches[2])
+    let to_line    = str2nr(matches[3])
+    let to_count   = (matches[4] == '') ? 1 : str2nr(matches[4])
+    return [from_line, from_count, to_line, to_count]
+  else
+    return []
+  end
+endfunction
 
+function! s:parse_hunks(diff)
+    let lines_count = len(a:diff)
+    if lines_count == 0
+        return []
+    endif
+    let hunk_start = -1
+
+    let hunks = []
+    let last_hunk = []
+
+    let i = -1
+    for line in a:diff
+        let i += 1
+        "let line = a:diff[i]
+        let hunk = s:parse_hunk(line)
+
+        if len(hunk) > 0
+            if last_hunk == []
+                let last_hunk = hunk
+                call add(last_hunk, i)
+            else
+                call add(last_hunk, i) "exclusive range
+                call add(hunks, last_hunk)
+
+                " Start next hunk
+                let last_hunk = hunk
+                call add(last_hunk, i)
+            endif
+        endif
+    endfor
+
+    " Add last hunk
+    if last_hunk != []
+        call add(last_hunk, i) "exclusive range
+        call add(hunks, last_hunk)
+        let hunk_start = []
+    endif
+
+    return hunks
+
+endfunction
+
+function! s:GetHunk(lnum)
+
+    let lnum = line('.')
+    let lineNr = lnum
+    while lineNr >= 0
+    "for lineNr in range(lnum, 0)
+        let line = getline(lineNr)
+        let hunk_info = s:parse_hunk(line)
+
+        if len(hunk_info) == 4
+            return hunk_info
+        endif
+
+        let lineNr -= 1
+    endwhile
+
+endfunction
+
+function! s:StageToggleHunk(lnum1, lnum2) abort
+    if a:lnum1 != a:lnum2
+        return ""
+    endif
+
+    let lnr = a:lnum1 - s:diff_start
+    "let hunk_info = []
+
+    for hunk in s:hunks
+        if lnr >= hunk[4] && lnr < hunk[5]
+            let hunk_info = hunk
+            break
+        endif
+    endfor
+
+    if exists('hunk_info')
+    "let hunk_info = s:GetHunk(a:lnum1)
+        echom hunk_info[0]
+    endif
+endfunction
 
 
 function! s:StageToggle(lnum1,lnum2) abort
+
+  if exists("s:diff_shown")
+       call s:StageToggleHunk(a:lnum1, a:lnum2)
+       return ""
+  endif
+
   if a:lnum1 == 1 && a:lnum2 == 1
     return 'Gedit /.git|call search("^index$", "wc")'
   endif
